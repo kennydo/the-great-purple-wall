@@ -1,0 +1,6 @@
+[package]
+name = "the-great-purple-wall"
+version = "0.1.0"
+authors = ["Kenny Do <kedo@patreon.com>"]
+
+[dependencies]
