@@ -20,7 +20,7 @@ use tokio_core::reactor::Core;
 use hyper::Client;
 use kuchiki::traits::*;
 use kuchiki::NodeRef;
-use regex::{ Captures, Regex};
+use regex::{ Captures, Regex, RegexBuilder};
 mod colors;
 use rocket::response::content;
 
@@ -42,11 +42,15 @@ fn create_colors_regex() -> Regex {
 
     let joined_groups = &color_groupings.join("|")[..];
 
-    Regex::new(&[
+    RegexBuilder::new(&[
         "(?P<color>",
         joined_groups,
         ")"
-    ].concat()[..]).unwrap()
+    ]
+    .concat()[..])
+    .case_insensitive(true)
+    .build()
+    .unwrap()
 }
 
 fn replace_color_names_in_text_child_nodes(node_ref: &NodeRef) {
@@ -90,7 +94,7 @@ fn fetch_and_mutate_url(url: &String) -> String{
             let document = kuchiki::parse_html().one(html);
             Ok(document)
         }).and_then(|parsed_dom| {
-            for css_match in parsed_dom.select("li, b, a, p, td").unwrap() {
+            for css_match in parsed_dom.select("li, b, a, p, td, div, span").unwrap() {
                 let as_node = css_match.as_node();
 
                 replace_color_names_in_text_child_nodes(as_node);
