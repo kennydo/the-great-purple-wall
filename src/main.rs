@@ -11,22 +11,15 @@ extern crate regex;
 extern crate rocket;
 extern crate tokio_core;
 
-use futures::future::Executor;
-use futures::{future, stream, Future, Stream};
+use futures::{Future, Stream};
 use html5ever::serialize::serialize;
-use hyper::Client;
 use kuchiki::traits::*;
 use kuchiki::NodeRef;
-use regex::{Captures, Regex, RegexBuilder};
+use regex::{Regex, RegexBuilder};
 use std::default::Default;
-use std::io;
 use tokio_core::reactor::Core;
 mod colors;
 use rocket::response::content;
-
-use hyper::{Response, StatusCode};
-
-use tokio_core::reactor::Handle;
 
 const DNS_WORKER_THREADS: usize = 4;
 
@@ -63,7 +56,6 @@ fn replace_color_names_in_text_child_nodes(node_ref: &NodeRef) {
 
 fn fetch_and_mutate_url(url: &String) -> String {
     let mut core = Core::new().unwrap();
-    let client = Client::new(&core.handle());
     let handle = &core.handle();
 
     let client = hyper::Client::configure()
