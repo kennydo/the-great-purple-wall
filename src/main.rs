@@ -15,7 +15,7 @@ use futures::{Future, Stream};
 use html5ever::serialize::serialize;
 use kuchiki::traits::*;
 use kuchiki::NodeRef;
-use regex::{Regex, RegexBuilder};
+use regex::{Captures, Regex, RegexBuilder};
 use std::default::Default;
 use tokio_core::reactor::Core;
 mod colors;
@@ -39,6 +39,7 @@ fn create_colors_regex() -> Regex {
 
 fn replace_color_names_in_text_child_nodes(node_ref: &NodeRef) {
     let colors_regex = create_colors_regex();
+
     for child_node in node_ref.children() {
         child_node.as_text().and_then(|text_node| {
             let original_text = text_node.borrow().clone();
@@ -46,7 +47,30 @@ fn replace_color_names_in_text_child_nodes(node_ref: &NodeRef) {
             Some(
                 text_node.replace(
                     colors_regex
-                        .replace_all(&original_text[..], "purple")
+                        .replace_all(&original_text[..], |caps: &Captures| {
+                            let mut uppercase_first_letter = false;
+                            let mut uppercase_second_letter = false;
+
+                            let original_text = &caps["color"];
+
+                            for (i, c) in original_text.chars().enumerate() {
+                                if i == 0 {
+                                    uppercase_first_letter = c.is_uppercase();
+                                } else if i == 1 {
+                                    uppercase_second_letter = c.is_uppercase();
+                                } else {
+                                    break;
+                                }
+                            }
+
+                            if uppercase_first_letter && uppercase_second_letter {
+                                format!("PURPLE")
+                            } else if uppercase_first_letter {
+                                format!("Purple")
+                            } else {
+                                format!("purple")
+                            }
+                        })
                         .to_string(),
                 ),
             )
@@ -82,7 +106,10 @@ fn fetch_and_mutate_url(url: &String) -> String {
             Ok(document)
         })
         .and_then(|parsed_dom| {
-            for css_match in parsed_dom.select("li, b, a, p, td, th, div, span, h1, h2, h3, h4").unwrap() {
+            for css_match in parsed_dom
+                .select("li, b, a, p, td, th, div, span, h1, h2, h3, h4")
+                .unwrap()
+            {
                 let as_node = css_match.as_node();
 
                 replace_color_names_in_text_child_nodes(as_node);
