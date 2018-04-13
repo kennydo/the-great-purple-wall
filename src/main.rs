@@ -56,7 +56,7 @@ fn replace_color_names_in_text_child_nodes(node_ref: &NodeRef) {
             let original_text = text_node.borrow().clone();
 
             Some(text_node.replace(
-                colors_regex.replace(&original_text[..], "purple").to_string()
+                colors_regex.replace_all(&original_text[..], "purple").to_string()
             ))
         });
     }
