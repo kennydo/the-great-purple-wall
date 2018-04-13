@@ -82,7 +82,7 @@ fn fetch_and_mutate_url(url: &String) -> String {
             Ok(document)
         })
         .and_then(|parsed_dom| {
-            for css_match in parsed_dom.select("li, b, a, p, td, div, span, h1, h2, h3, h4").unwrap() {
+            for css_match in parsed_dom.select("li, b, a, p, td, th, div, span, h1, h2, h3, h4").unwrap() {
                 let as_node = css_match.as_node();
 
                 replace_color_names_in_text_child_nodes(as_node);
