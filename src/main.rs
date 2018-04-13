@@ -1,21 +1,38 @@
+#![feature(plugin)]
+#![plugin(rocket_codegen)]
+#![feature(custom_derive)]
+
 extern crate futures;
-extern crate gotham;
 extern crate html5ever;
 extern crate hyper;
 extern crate hyper_tls;
 extern crate kuchiki;
 extern crate tokio_core;
 extern crate regex;
+extern crate rocket;
 
 use std::io;
 use std::default::Default;
-use futures::{Future, Stream};
+use futures::{future, stream, Future, Stream};
+use futures::future::Executor;
 use html5ever::serialize::serialize;
-
+use tokio_core::reactor::Core;
+use hyper::Client;
 use kuchiki::traits::*;
 use kuchiki::NodeRef;
 use regex::{ Captures, Regex};
 mod colors;
+use rocket::response::content;
+
+
+
+
+use hyper::{Response, StatusCode};
+
+
+use tokio_core::reactor::Handle;
+
+const DNS_WORKER_THREADS: usize = 4;
 
 fn create_colors_regex() -> Regex {
     let mut color_groupings = Vec::new();
@@ -39,25 +56,22 @@ fn replace_color_names_in_text_child_nodes(node_ref: &NodeRef) {
             let original_text = text_node.borrow().clone();
 
             Some(text_node.replace(
-                colors_regex.replace(&original_text[..], |caps: &Captures| {
-                    format!("lol {} asd", &caps[1])
-                }).to_string()
+                colors_regex.replace(&original_text[..], "purple").to_string()
             ))
         });
     }
 }
 
-fn main() {
-
-
-    let mut core = tokio_core::reactor::Core::new().unwrap();
-    const DNS_WORKER_THREADS: usize = 4;
+fn fetch_and_mutate_url(url: &String) -> String{
+    let mut core = Core::new().unwrap();
+    let client = Client::new(&core.handle());
+    let handle = &core.handle();
 
     let client = hyper::Client::configure()
-        .connector(hyper_tls::HttpsConnector::new(DNS_WORKER_THREADS, &core.handle()).unwrap())
-        .build(&core.handle());
+        .connector(hyper_tls::HttpsConnector::new(DNS_WORKER_THREADS, handle).unwrap())
+        .build(handle);
 
-    let uri = "https://en.wikipedia.org/wiki/Teal".parse().expect("asd");
+    let uri = url.parse().unwrap();
 
     let work = client
         .get(uri)
@@ -75,16 +89,32 @@ fn main() {
         .and_then(|html| {
             let document = kuchiki::parse_html().one(html);
             Ok(document)
+        }).and_then(|parsed_dom| {
+            for css_match in parsed_dom.select("li, b, a, p, td").unwrap() {
+                let as_node = css_match.as_node();
+
+                replace_color_names_in_text_child_nodes(as_node);
+            };
+
+
+            let mut bytes = vec![];
+            serialize(&mut bytes, &parsed_dom, Default::default()).unwrap();
+            let result = String::from_utf8(bytes).unwrap();
+            Ok(result)
         });
+    core.run(work).unwrap()
+}
 
-    let parsed_dom = core.run(work).unwrap();
+#[derive(FromForm)]
+struct Task {
+    url: String
+}
 
-    for css_match in parsed_dom.select("li, b, a, p, td").unwrap() {
-        let as_node = css_match.as_node();
+#[get("/purplize?<task>")]
+fn purplize(task: Task) -> content::Html<String> {
+    content::Html(fetch_and_mutate_url(&task.url))
+}
 
-        replace_color_names_in_text_child_nodes(as_node);
-    }
-
-
-    serialize(&mut io::stdout(), &parsed_dom, Default::default()).unwrap();
+fn main() {
+    rocket::ignite().mount("/", routes![purplize]).launch();
 }
